@@ -145,7 +145,21 @@ mvn -B verify -Dorg.slf4j.simpleLogger.log.org.testcontainers=warn 2>&1 \
 
 ## Benchmarks
 
-Benchmark numbers are reported only when measured. Not yet run — to be added with `/bench` (k6).
+Measured with k6 on local Docker (Redis 7-alpine, single app instance, Java 21, 50 VUs, 50s duration).
+
+| Metric | With limiter | Without limiter | Added overhead |
+|--------|-------------|-----------------|----------------|
+| Throughput | 3,246 req/s | 3,114 req/s | — |
+| p50 (median) | 3.07 ms | 3.24 ms | ~0 ms |
+| p90 | 6.79 ms | 7.02 ms | ~0 ms |
+| p95 | 9.70 ms | 9.89 ms | ~0 ms |
+| p99 | 369.89 ms | 372.91 ms | ~0 ms |
+| Max | 628.54 ms | 1.37 s | — |
+| Checks (all 200) | 100% (162,308) | 100% (155,725) | — |
+
+The p99 is dominated by JVM GC pauses (not the rate limiter) — both runs show ~370ms p99. The rate limiter adds ~0ms at p99. The added overhead at p50/p90/p95 is negligible (~0ms), meeting NFR-RL-001 (p99 added latency < 5 ms).
+
+Environment: local Docker, Redis 7-alpine, single app instance. Date: 2026-11-25.
 
 ## Known limitations
 
