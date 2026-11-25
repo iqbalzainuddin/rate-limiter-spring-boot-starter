@@ -171,3 +171,7 @@ Environment: local Docker, Redis 7-alpine, single app instance. Date: 2026-11-25
 ## License
 
 Apache License 2.0.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
