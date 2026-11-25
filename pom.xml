@@ -87,12 +87,12 @@
 		<repository>
 			<id>github</id>
 			<name>GitHub Packages</name>
-			<url>https://maven.pkg.github.com/iqbalmz/rate-limiter-spring-boot-starter</url>
+			<url>https://maven.pkg.github.com/iqbalzainuddin/rate-limiter-spring-boot-starter</url>
 		</repository>
 		<snapshotRepository>
 			<id>github</id>
 			<name>GitHub Packages</name>
-			<url>https://maven.pkg.github.com/iqbalmz/rate-limiter-spring-boot-starter</url>
+			<url>https://maven.pkg.github.com/iqbalzainuddin/rate-limiter-spring-boot-starter</url>
 		</snapshotRepository>
 	</distributionManagement>
     <build>
