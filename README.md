@@ -1,4 +1,4 @@
-![CI](https://github.com/iqbalmz/rate-limiter-spring-boot-starter/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/iqbalzainuddin/rate-limiter-spring-boot-starter/actions/workflows/ci.yml/badge.svg)
 
 # rate-limiter-spring-boot-starter
 
