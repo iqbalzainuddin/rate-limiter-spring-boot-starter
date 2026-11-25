@@ -1,8 +1,8 @@
+![CI](https://github.com/iqbalmz/rate-limiter-spring-boot-starter/actions/workflows/ci.yml/badge.svg)
+
 # rate-limiter-spring-boot-starter
 
 A Spring Boot starter that provides **distributed, atomic rate limiting** (token bucket) backed by Redis. Works across multiple application replicas because all state lives in Redis, and check-and-decrement is a single atomic Lua script.
-
-Status: In build (Step 10 of 11).
 
 ## Why
 
@@ -20,7 +20,7 @@ A single-instance in-memory limiter breaks when the service runs on multiple rep
 
 ## Quick start
 
-Add the dependency (published to GitHub Packages / local `~/.m2`):
+Add the dependency (available via local `~/.m2` after `mvn install`):
 
 ```xml
 <dependency>
@@ -56,6 +56,19 @@ rate-limiter:
     refill-per-second: 10
 ```
 
+## Run (local development)
+
+```bash
+# 1. Start Redis
+docker run -d --name rl-redis -p 6379:6379 redis:7-alpine
+
+# 2. Build and test
+mvn -B verify          # requires Docker for Testcontainers
+
+# 3. Install to local ~/.m2 for use by other projects
+mvn -B install -DskipTests
+```
+
 ## Configuration properties
 
 | Property | Type | Default | Description |
@@ -71,6 +84,20 @@ rate-limiter:
 | `rate-limiter.filter.capacity` | Long | (default) | Override capacity for the filter. |
 | `rate-limiter.filter.refill-per-second` | Double | (default) | Override refill rate for the filter. |
 
+## Architecture
+
+```mermaid
+flowchart LR
+    Client -->|HTTP| Entry[Filter / @RateLimited aspect]
+    Entry --> RL[RateLimiter bean]
+    RL --> Redis[(Redis: Lua script)]
+    RL -->|allowed| Handler[Controller method]
+    RL -->|exceeded| R429[429 + Retry-After]
+    Redis -. outage .-> Fail[Fail open / closed]
+```
+
+All state lives in Redis. The library beans are stateless singletons, so the app tier scales horizontally.
+
 ## Algorithm comparison
 
 | Algorithm | Memory | Accuracy | Burst handling | Notes |
@@ -82,19 +109,18 @@ rate-limiter:
 
 **Why token bucket:** explicit burst sizing matches real traffic (a page load fires many requests at once), O(1) memory per key, and check-and-decrement is a single atomic Redis operation.
 
+## Trade-offs
+
+- **Fail open by default:** preserves availability during a Redis outage; abuse is unbounded only for the outage duration. Operators needing strictness set `fail-mode: CLOSED`.
+- **Servlet-only (v1):** reactive/WebFlux is deferred to v2; the core `RateLimiter` bean is stack-agnostic and reusable.
+- **Optional dependencies:** Redis and validation are `optional=true`; consumers opt in. AOP is a hard dependency because `@RateLimited` needs it.
+- **No Micrometer metrics yet** (known issue): rejection counts and latency are logged but not exposed as metrics.
+
 ## Redis outage behavior
 
-- Default **fail open**: if Redis is unreachable, requests are allowed and a WARN is logged. Availability is preserved; abuse is unbounded only for the outage duration.
+- Default **fail open**: if Redis is unreachable, requests are allowed and a WARN is logged.
 - Set `rate-limiter.fail-mode: CLOSED` to reject all traffic on outage (stricter, but turns a Redis blip into a full API outage).
 - All Redis calls are bounded by `rate-limiter.timeout` (default 100 ms); the host request never hangs.
-
-## Architecture
-
-```
-Client -> Filter / @RateLimited aspect -> RateLimiter -> Redis (Lua script)
-                                     |-> 429 + Retry-After (on exceed)
-                                     |-> fail open/closed (on Redis outage)
-```
 
 ## Test
 
@@ -102,21 +128,31 @@ Client -> Filter / @RateLimited aspect -> RateLimiter -> Redis (Lua script)
 mvn -B verify   # requires Docker for Testcontainers
 mvn -B -Dtest=AutoConfigTest test
 mvn -B -Dtest=RateLimiterConcurrencyTest test
+mvn -B -Dtest=MultiInstanceRateLimitTest test
 ```
 
 Tests:
 - `AutoConfigTest` — auto-configuration activation, opt-out, bean registration.
 - `RateLimiterConcurrencyTest` — 200 threads, one key, allowed never exceeds capacity.
+- `MultiInstanceRateLimitTest` — two instances share one Redis limit.
 - `RedisOutageFailModeTest` — fail-open allows, fail-closed rejects on outage.
+
+Clean output:
+```bash
+mvn -B verify -Dorg.slf4j.simpleLogger.log.org.testcontainers=warn 2>&1 \
+  | grep -iE "Tests run:|BUILD (SUCCESS|FAILURE)"
+```
 
 ## Benchmarks
 
-Benchmark numbers are reported only when measured with `/bench`. (Not yet run.)
+Benchmark numbers are reported only when measured. Not yet run — to be added with `/bench` (k6).
 
-## Publishing
+## Known limitations
 
-- Local: `mvn install` (installs to `~/.m2`).
-- GitHub Packages: `mvn deploy` (requires `distributionManagement` + token).
+- `X-Forwarded-For` is trusted unconditionally (IP spoofing risk) — see known issues.
+- Non-web `@RateLimited` invocations share a single fallback bucket.
+- Micrometer metrics are not yet exposed.
+- WebFlux is not supported in v1.
 
 ## License
 
